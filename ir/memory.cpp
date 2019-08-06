@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include <iostream>
 #include "ir/memory.h"
 #include "ir/state.h"
 #include "util/compiler.h"
@@ -133,6 +134,10 @@ expr Pointer::is_aligned(unsigned align) const {
 void Pointer::is_dereferenceable(const expr &bytes, unsigned align) {
   expr block_sz = block_size();
   expr offset = get_offset();
+  // cout << "pointer: " << pointer << endl;
+  // cout << "BBBBBBBBBBBBBBBBBBB" << endl;
+  // cout << "bytes: " << bytes << endl;
+  // cout << "align: " << align << endl;
 
   // 1) check that offset is within bounds and that arith doesn't overflow
   m.state->addUB((offset + bytes).zextOrTrunc(m.bits_size_t).ule(block_sz));

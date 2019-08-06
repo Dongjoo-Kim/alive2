@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include <iostream>
 #include "ir/instr.h"
 #include "ir/function.h"
 #include "ir/type.h"
@@ -1149,6 +1150,7 @@ void Alloc::print(std::ostream &os) const {
 StateValue Alloc::toSMT(State &s) const {
   auto &[sz, np] = s[size];
   s.addUB(np);
+  cout << "!!!!!!!!!!!alloc!!!!!!!!!!" << endl;
   return { s.getMemory().alloc(sz, align, true), true };
 }
 
@@ -1253,6 +1255,7 @@ void Load::print(std::ostream &os) const {
 StateValue Load::toSMT(State &s) const {
   auto &[p, np] = s[ptr];
   s.addUB(np);
+  cout << "!!!!!!!!!!!load!!!!!!!!!!" << endl;
   return s.getMemory().load(p, getType(), align);
 }
 
@@ -1274,6 +1277,7 @@ StateValue Store::toSMT(State &s) const {
   auto &[p, np] = s[ptr];
   s.addUB(np);
   s.getMemory().store(p, s[val], val.getType(), align);
+  cout << "!!!!!!!!!!!store!!!!!!!!!!" << endl;
   return {};
 }
 
@@ -1283,6 +1287,52 @@ expr Store::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> Store::dup(const string &suffix) const {
   return make_unique<Store>(ptr, val, align);
+}
+
+
+void Memset::print(std::ostream &os) const {
+  os << "memset " << ptr << ", " << val << ", " << bytes << ", align " << align;
+}
+
+StateValue Memset::toSMT(State &s) const {
+  // TODO: check following lines are correct
+  auto &[p, np] = s[ptr];
+  s.addUB(np);
+  s.getMemory().memset(p, s[val], s[bytes], align);
+  cout << "!!!!!!!!!!!store!!!!!!!!!!" << endl;
+  return {};
+}
+
+expr Memset::getTypeConstraints(const Function &f) const {
+  // TODO: add bytes is an integer?
+  return ptr.getType().enforcePtrType() && bytes.getType().enforceIntType();
+}
+
+unique_ptr<Instr> Memset::dup(const string &suffix) const {
+  return make_unique<Memset>(ptr, val, bytes, align);
+}
+
+
+void Memcpy::print(std::ostream &os) const {
+  os << "memcpy " << ptr << ", " << val << ", " << bytes << ", align " << align;
+}
+
+StateValue Memset::toSMT(State &s) const {
+  // TODO: check following lines are correct
+  auto &[p, np] = s[ptr];
+  s.addUB(np);
+  s.getMemory().memset(p, s[val], s[bytes], align);
+  cout << "!!!!!!!!!!!store!!!!!!!!!!" << endl;
+  return {};
+}
+
+expr Memset::getTypeConstraints(const Function &f) const {
+  // TODO: add bytes is an integer?
+  return ptr.getType().enforcePtrType() && bytes.getType().enforceIntType();
+}
+
+unique_ptr<Instr> Memset::dup(const string &suffix) const {
+  return make_unique<Memset>(ptr, val, bytes, align);
 }
 
 }

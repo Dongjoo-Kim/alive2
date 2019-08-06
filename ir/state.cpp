@@ -5,6 +5,7 @@
 #include "ir/function.h"
 #include "smt/smt.h"
 #include <cassert>
+#include <iostream>
 
 using namespace smt;
 using namespace std;
@@ -26,7 +27,11 @@ void State::syncWithSrc(const State &src) {
 
 const StateValue& State::exec(const Value &v) {
   assert(undef_vars.empty());
+  cout << "----------------------" << endl;
+  cout << "v: " << v << endl;
   auto val = v.toSMT(*this);
+  cout << "val: " << val << endl;
+  cout << "----------------------" << endl;
   ENSURE(values_map.try_emplace(&v, (unsigned)values.size()).second);
   values.emplace_back(&v, ValTy(move(val), move(undef_vars)));
 
