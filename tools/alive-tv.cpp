@@ -247,9 +247,7 @@ int main(int argc, char **argv) {
   TransformVerify verifier(t, false);
   t.print(cout, print_opts);
 
-  cout << "---------1----------" << endl;
   Errors errs = verifier.verify();
-  cout << "---------2----------" << endl;
   bool result(errs);
   if (result) {
     cerr << "Transformation doesn't verify!\n" << errs << endl;

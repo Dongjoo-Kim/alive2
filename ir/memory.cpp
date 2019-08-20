@@ -134,10 +134,6 @@ expr Pointer::is_aligned(unsigned align) const {
 void Pointer::is_dereferenceable(const expr &bytes, unsigned align) {
   expr block_sz = block_size();
   expr offset = get_offset();
-  // cout << "pointer: " << pointer << endl;
-  // cout << "BBBBBBBBBBBBBBBBBBB" << endl;
-  // cout << "bytes: " << bytes << endl;
-  // cout << "align: " << align << endl;
 
   // 1) check that offset is within bounds and that arith doesn't overflow
   m.state->addUB((offset + bytes).zextOrTrunc(m.bits_size_t).ule(block_sz));
@@ -155,11 +151,11 @@ void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
 }
 
 expr disjoint(expr offset1, const expr &len1, expr offset2, const expr &len2) {
-  return (offset1+len1).ult(offset2) || (offset2+len2).ult(offset1);
+  return ((offset1+len1).ule(offset2) || (offset2+len2).ule(offset1));
 }
 
 void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2, const expr &len2) const {
-  m.state->addUB(get_bid() == ptr2.get_bid() && disjoint(get_offset(), len1, ptr2.get_offset(), len2));
+  m.state->addUB(get_bid() != ptr2.get_bid() || disjoint(get_offset(), len1, ptr2.get_offset(), len2));
 }
 
 ostream& operator<<(ostream &os, const Pointer &p) {
@@ -335,7 +331,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
     Pointer idx(*this, expr::mkVar(name.c_str(), dst.bits()));
 
     expr cond = idx.uge(dst).both() && idx.ult(dst + bytes).both();
-    expr val = expr::mkIf(cond, blocks_val.store(idx(), blocks_val.load((src + idx.get_offset()).release())), blocks_val);
+    expr val = expr::mkIf(cond, blocks_val.load((src + idx.get_offset()).release()), blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
   }
 }
