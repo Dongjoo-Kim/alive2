@@ -1909,6 +1909,42 @@ unique_ptr<Instr> StartLifetime::dup(const string &suffix) const {
 }
 
 
+vector<Value*> Realloc::operands() const {
+  return { ptr, size };
+}
+
+void Realloc::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+  RAUW(size);
+}
+
+void Realloc::print(std::ostream &os) const {
+  os << getName() << " = realloc " << *ptr << ", " << *size;
+}
+
+StateValue Realloc::toSMT(State &s) const {
+  auto &[p, np_ptr] = s[*ptr];
+  auto &[sz, np_size] = s[*size];
+  auto p = s.getMemory().alloc(sz, 8, Memory::HEAP);
+
+  auto nullp = Pointer::mkNullPointer(s.getMemory());
+  auto flag = expr::mkFreshVar("malloc_isnull", expr(true));
+  s.addQuantVar(flag);
+  return { expr::mkIf(move(flag), nullp.release(), move(p)), expr(np_ptr) };
+}
+
+expr Realloc::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         getType().enforcePtrType() &&
+         ptr->getType().enforcePtrType() &&
+         size->getType().enforceIntType();
+}
+
+unique_ptr<Instr> Realloc::dup(const string &suffix) const {
+  return make_unique<Realloc>(getType(), getName() + suffix, *ptr, *size);
+}
+
+
 vector<Value*> Free::operands() const {
   return { ptr };
 }
