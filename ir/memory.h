@@ -273,7 +273,7 @@ public:
               const smt::expr &bytesize, unsigned align);
   void memcpy(const smt::expr &dst, const smt::expr &src,
               const smt::expr &bytesize, unsigned align_dst, unsigned align_src,
-              bool move, const smt::expr &precond);
+              bool move);
 
   smt::expr ptr2int(const smt::expr &ptr);
   smt::expr int2ptr(const smt::expr &val);

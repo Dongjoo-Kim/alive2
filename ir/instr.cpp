@@ -1,6 +1,6 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
-#include <iostream>
+
 #include "ir/instr.h"
 #include "ir/function.h"
 #include "ir/globals.h"
@@ -1925,6 +1925,26 @@ void Realloc::print(std::ostream &os) const {
 StateValue Realloc::toSMT(State &s) const {
   auto &[p, np_ptr] = s[*ptr];
   auto &[sz, np_size] = s[*size];
+  s.addUB(np_ptr);
+
+  auto p_new = s.getMemory().alloc(sz, 8, Memory::HEAP);
+  Pointer ptr(s.getMemory(), p);
+  expr p_size = ptr.block_size();
+
+  s.getMemory().memcpy(p_new, p, expr::mkIf(sz.ule(p_size), sz, sz), 1,
+                       1, true);
+
+  s.getMemory().free(p);
+
+  auto nullp = Pointer::mkNullPointer(s.getMemory());
+  auto flag = expr::mkFreshVar("malloc_isnull", expr(true));
+  s.addQuantVar(flag);
+
+  return { move(p_new), true };
+
+  /*
+  auto &[p, np_ptr] = s[*ptr];
+  auto &[sz, np_size] = s[*size];
   s.addUB(np_ptr && np_size);
 
   auto p_new = s.getMemory().alloc(sz, 8, Memory::HEAP);
@@ -1941,6 +1961,7 @@ StateValue Realloc::toSMT(State &s) const {
   s.addQuantVar(flag);
 
   return { move(p_new), true };
+  */
 /*
   return { expr::mkIf((sz == expr::mkUInt(0, sz.bits()) && !ptr.isNull()) ||
                       move(flag), nullp.release(), move(p_new)),
