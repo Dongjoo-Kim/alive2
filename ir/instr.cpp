@@ -1931,42 +1931,19 @@ StateValue Realloc::toSMT(State &s) const {
   Pointer ptr(s.getMemory(), p);
   expr p_size = ptr.block_size();
 
-  s.getMemory().memcpy(p_new, p, expr::mkIf(sz.ule(p_size), sz, sz), 1,
-                       1, true);
-
-  s.getMemory().free(p);
-
   auto nullp = Pointer::mkNullPointer(s.getMemory());
-  auto flag = expr::mkFreshVar("malloc_isnull", expr(true));
-  s.addQuantVar(flag);
+  expr is_null = (p == nullp());
+
+  expr memcpy_size = expr::mkIf(is_null, expr::mkUInt(0, sz.bits()),
+                                expr::mkIf(sz.ule(p_size), sz, p_size));
+                                
+  // If memcpy's size is zero, then both ptrs can be NULL.
+  s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, true);
+
+  // If allocaction failed, we should not free previous ptr.
+  s.getMemory().free(expr::mkIf(is_null, nullp(), p));
 
   return { move(p_new), true };
-
-  /*
-  auto &[p, np_ptr] = s[*ptr];
-  auto &[sz, np_size] = s[*size];
-  s.addUB(np_ptr && np_size);
-
-  auto p_new = s.getMemory().alloc(sz, 8, Memory::HEAP);
-  Pointer ptr(s.getMemory(), p);
-  expr p_size = ptr.block_size();
-
-  s.getMemory().memcpy(p_new, p, expr::mkIf(sz.ule(p_size), sz, sz), 1,
-                       1, true, precond);
-
-  s.getMemory().free(p, precond);
-
-  auto nullp = Pointer::mkNullPointer(s.getMemory());
-  auto flag = expr::mkFreshVar("malloc_isnull", expr(true));
-  s.addQuantVar(flag);
-
-  return { move(p_new), true };
-  */
-/*
-  return { expr::mkIf((sz == expr::mkUInt(0, sz.bits()) && !ptr.isNull()) ||
-                      move(flag), nullp.release(), move(p_new)),
-           expr(np_ptr) };
-*/
 }
 
 expr Realloc::getTypeConstraints(const Function &f) const {
