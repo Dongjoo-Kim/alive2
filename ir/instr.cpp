@@ -1,6 +1,6 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
-
+#include <iostream>
 #include "ir/instr.h"
 #include "ir/function.h"
 #include "ir/globals.h"
@@ -1928,15 +1928,19 @@ StateValue Realloc::toSMT(State &s) const {
   s.addUB(np_ptr);
 
   auto p_new = s.getMemory().alloc(sz, 8, Memory::HEAP);
-  Pointer ptr(s.getMemory(), p);
-  expr p_size = ptr.block_size();
+//  Pointer ptr(s.getMemory(), p);
+  //expr p_size = ptr.block_size();
 
   auto nullp = Pointer::mkNullPointer(s.getMemory());
   expr is_null = (p == nullp());
 
-  expr memcpy_size = expr::mkIf(is_null, expr::mkUInt(0, sz.bits()),
-                                expr::mkIf(sz.ule(p_size), sz, p_size));
-                                
+  expr memcpy_size = expr::mkIf(is_null, expr::mkUInt(0, sz.bits()), sz);
+//                                expr::mkIf(sz.ule(sz), sz, sz));
+
+  cout << "--------------------" << endl;
+  cout << "p: " << p << endl;
+  cout << "--------------------" << endl;
+
   // If memcpy's size is zero, then both ptrs can be NULL.
   s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, true);
 
