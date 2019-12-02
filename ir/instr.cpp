@@ -1927,27 +1927,26 @@ StateValue Realloc::toSMT(State &s) const {
   auto &[sz, np_size] = s[*size];
   s.addUB(np_ptr);
 
+  // If sz > p_sz, it is filled it with poison (local_block_val is
+  // initialized with poison).
   auto p_new = s.getMemory().alloc(sz, 8, Memory::HEAP);
-//  Pointer ptr(s.getMemory(), p);
-  //expr p_size = ptr.block_size();
+  Pointer ptr(s.getMemory(), p);
+  expr p_sz = ptr.block_size();
 
   auto nullp = Pointer::mkNullPointer(s.getMemory());
-  expr is_null = (p == nullp());
+  expr is_null = (p_new == nullp());
 
-  expr memcpy_size = expr::mkIf(is_null, expr::mkUInt(0, sz.bits()), sz);
-//                                expr::mkIf(sz.ule(sz), sz, sz));
-
-  cout << "--------------------" << endl;
-  cout << "p: " << p << endl;
-  cout << "--------------------" << endl;
+  expr sz_zext = sz.zextOrTrunc(p_sz.bits());
+  expr memcpy_size = expr::mkIf(is_null, expr::mkUInt(0, p_sz.bits()),
+                                expr::mkIf(p_sz.ule(sz_zext), p_sz, sz_zext));
 
   // If memcpy's size is zero, then both ptrs can be NULL.
-  s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, true);
+  s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, false);
 
-  // If allocaction failed, we should not free previous ptr.
-  s.getMemory().free(expr::mkIf(is_null, nullp(), p));
+  // If allocation failed, we should not free previous ptr.
+  //s.getMemory().free(expr::mkIf(is_null, nullp(), p));
 
-  return { move(p_new), true };
+  return { move(p_new), expr(np_size) };
 }
 
 expr Realloc::getTypeConstraints(const Function &f) const {
