@@ -1800,15 +1800,22 @@ unique_ptr<Instr> Alloc::dup(const string &suffix) const {
 
 
 vector<Value*> Malloc::operands() const {
-  return { size };
+  if (allocType == tMalloc)
+    return { size };
+  else if (allocType == tRealloc)
+    return { ptr, size };
 }
 
 void Malloc::rauw(const Value &what, Value &with) {
   RAUW(size);
+  RAUW(ptr);
 }
 
 void Malloc::print(std::ostream &os) const {
-  os << getName() << " = malloc " << *size;
+  if (allocType == tMalloc)
+    os << getName() << " = malloc " << *size;
+  else if (allocType == tRealloc)
+    os << getName() << " = realloc " << *ptr << ", " << *size;
 }
 
 StateValue Malloc::toSMT(State &s) const {
@@ -1827,13 +1834,20 @@ StateValue Malloc::toSMT(State &s) const {
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
-         getType().enforcePtrType() &&
-         size->getType().enforceIntType();
+  if (allocType == tMalloc)
+    return Value::getTypeConstraints() &&
+           getType().enforcePtrType() &&
+           size->getType().enforceIntType();
+  else if (allocType == tRealloc)
+    return Value::getTypeConstraints() &&
+           getType().enforcePtrType() &&
+           ptr->getType().enforcePtrType() &&
+           size->getType().enforceIntType();
 }
 
 unique_ptr<Instr> Malloc::dup(const string &suffix) const {
-  return make_unique<Malloc>(getType(), getName() + suffix, *size, isNonNull);
+  return make_unique<Malloc>(getType(), getName() + suffix, *size, *ptr,
+                             isNonNull, allocType);
 }
 
 
@@ -1906,58 +1920,6 @@ expr StartLifetime::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> StartLifetime::dup(const string &suffix) const {
   return make_unique<StartLifetime>(*ptr);
-}
-
-
-vector<Value*> Realloc::operands() const {
-  return { ptr, size };
-}
-
-void Realloc::rauw(const Value &what, Value &with) {
-  RAUW(ptr);
-  RAUW(size);
-}
-
-void Realloc::print(std::ostream &os) const {
-  os << getName() << " = realloc " << *ptr << ", " << *size;
-}
-
-StateValue Realloc::toSMT(State &s) const {
-  auto &[p, np_ptr] = s[*ptr];
-  auto &[sz, np_size] = s[*size];
-  s.addUB(np_ptr);
-
-  // If sz > p_sz, it is filled it with poison (local_block_val is
-  // initialized with poison).
-  auto p_new = s.getMemory().alloc(sz, 8, Memory::HEAP);
-  Pointer ptr(s.getMemory(), p);
-  expr p_sz = ptr.block_size();
-
-  auto nullp = Pointer::mkNullPointer(s.getMemory());
-  expr is_null = (p_new == nullp());
-
-  expr sz_zext = sz.zextOrTrunc(p_sz.bits());
-  expr memcpy_size = expr::mkIf(is_null, expr::mkUInt(0, p_sz.bits()),
-                                expr::mkIf(p_sz.ule(sz_zext), p_sz, sz_zext));
-
-  // If memcpy's size is zero, then both ptrs can be NULL.
-  s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, false);
-
-  // If allocation failed, we should not free previous ptr.
-  //s.getMemory().free(expr::mkIf(is_null, nullp(), p));
-
-  return { move(p_new), expr(np_size) };
-}
-
-expr Realloc::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
-         getType().enforcePtrType() &&
-         ptr->getType().enforcePtrType() &&
-         size->getType().enforceIntType();
-}
-
-unique_ptr<Instr> Realloc::dup(const string &suffix) const {
-  return make_unique<Realloc>(getType(), getName() + suffix, *ptr, *size);
 }
 
 

@@ -12,7 +12,6 @@ namespace IR {
 
 class Function;
 
-
 class Instr : public Value {
 protected:
   Instr(Type &type, std::string &&name) : Value(type, std::move(name)) {}
@@ -399,13 +398,21 @@ public:
 
 
 class Malloc final : public Instr {
-  Value *size;
+public:
+  enum AllocType { tMalloc, tCalloc, tRealloc };
+
+private:
+  Value *size, *ptr;
   // Is this malloc (or equivalent operation, like new()) never returning
   // null?
   bool isNonNull;
+  AllocType allocType;
+
 public:
-  Malloc(Type &type, std::string &&name, Value &size, bool isNonNull)
-    : Instr(type, std::move(name)), size(&size), isNonNull(isNonNull) {}
+  Malloc(Type &type, std::string &&name, Value &size, Value &ptr,
+         bool isNonNull, AllocType allocType)
+    : Instr(type, std::move(name)), size(&size), ptr(&ptr), isNonNull(isNonNull),
+      allocType(allocType) {}
 
   Value& getSize() const { return *size; }
   std::vector<Value*> operands() const override;
