@@ -12,6 +12,7 @@ namespace IR {
 
 class Function;
 
+
 class Instr : public Value {
 protected:
   Instr(Type &type, std::string &&name) : Value(type, std::move(name)) {}
@@ -446,20 +447,6 @@ class StartLifetime final : public Instr {
 public:
   StartLifetime(Value &ptr) : Instr(Type::voidTy, "start_lifetime"),
       ptr(&ptr) {}
-
-  std::vector<Value*> operands() const override;
-  void rauw(const Value &what, Value &with) override;
-  void print(std::ostream &os) const override;
-  StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
-};
-
-class Realloc final : public Instr {
-  Value *ptr, *size;
-public:
-  Realloc(Type &type, std::string &&name, Value &ptr, Value &size)
-    : Instr(type, std::move(name)), ptr(&ptr), size(&size) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
