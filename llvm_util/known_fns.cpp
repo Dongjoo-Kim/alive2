@@ -42,9 +42,9 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
                                      isNonNull, Malloc::tMalloc));
   } else if (llvm::isCallocLikeFn(&i, &TLI, false)) {
     RETURN_KNOWN(make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1]));
-  //} else if (llvm::isReallocLikeFn(&i, &TLI)) {
-    //RETURN_KNOWN(make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1],
-      //                               false, Malloc::tRealloc));
+  } else if (llvm::isReallocLikeFn(&i, &TLI, false)) {
+    RETURN_KNOWN(make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1],
+                                     false, Malloc::tRealloc));
   } else if (llvm::isFreeCall(&i, &TLI)) {
     RETURN_KNOWN(make_unique<Free>(*args[0]));
   }
