@@ -1826,8 +1826,7 @@ StateValue Malloc::toSMT(State &s) const {
     expr nonnull = expr::mkBoolVar("malloc_never_fails");
     auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, np, nonnull);
 
-    expr nullp = Pointer::mkNullPointer(s.getMemory())();
-    return { expr::mkIf(move(allocated), move(p), move(nullp)), expr(np) };
+    return { move(p), expr(np) };
   } else {
     auto &[p, np_ptr] = s[*ptr];
     auto &[sz, np_size] = s[*size];
@@ -1842,7 +1841,7 @@ StateValue Malloc::toSMT(State &s) const {
     expr sz_zext = sz.zextOrTrunc(p_sz.bits());
 
     expr memcpy_size = expr::mkIf(allocated,
-                                  expr::mkIf(p_sz.ule(p_sz), p_sz, sz_zext),
+                                  expr::mkIf(p_sz.ule(sz_zext), p_sz, sz_zext),
                                   expr::mkUInt(0, p_sz.bits()));
 
     // If memcpy's size is zero, then both ptrs can be NULL.
@@ -1850,10 +1849,9 @@ StateValue Malloc::toSMT(State &s) const {
 
     // If allocation failed, we should not free previous ptr.
     expr nullp = Pointer::mkNullPointer(s.getMemory())();
-    s.getMemory().free(expr::mkIf(allocated, p, nullp), false); //TODO: Check free unconstrainted
+    s.getMemory().free(expr::mkIf(allocated, p, nullp), false);
 
-    return { expr::mkIf(move(allocated), move(p_new), move(nullp)),
-             expr(np_size) };
+    return { move(p_new), expr(np_size) };
   }
 }
 
