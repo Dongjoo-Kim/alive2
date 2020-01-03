@@ -40,12 +40,12 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     bool isNonNull = i.getCalledFunction()->getName() != "malloc";
     auto nullp = NullPointerValue(*ty);
     RETURN_KNOWN(make_unique<Malloc>(*ty, value_name(i), nullp, *args[0],
-                                     isNonNull, Malloc::tMalloc));
+                                     isNonNull));
   } else if (llvm::isCallocLikeFn(&i, &TLI, false)) {
     RETURN_KNOWN(make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1]));
   } else if (llvm::isReallocLikeFn(&i, &TLI, false)) {
     RETURN_KNOWN(make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1],
-                                     false, Malloc::tRealloc));
+                                     false, true));
   } else if (llvm::isFreeCall(&i, &TLI)) {
     RETURN_KNOWN(make_unique<Free>(*args[0]));
   }

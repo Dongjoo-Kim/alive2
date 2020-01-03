@@ -935,7 +935,7 @@ static unique_ptr<Instr> parse_malloc(string_view name) {
   // Malloc returns a pointer at address space 0
   Type &pointer_type = get_pointer_type(0);
   auto nullp = NullPointerValue(pointer_type);
-  return make_unique<Malloc>(pointer_type, string(name), nullp, op, false, Malloc::tMalloc);
+  return make_unique<Malloc>(pointer_type, string(name), nullp, op, false);
 }
 
 static unique_ptr<Instr> parse_extractelement(string_view name) {

@@ -1,6 +1,6 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
-#include <iostream>
+
 #include "ir/instr.h"
 #include "ir/function.h"
 #include "ir/globals.h"
@@ -1800,7 +1800,7 @@ unique_ptr<Instr> Alloc::dup(const string &suffix) const {
 
 
 vector<Value*> Malloc::operands() const {
-  if (allocType == tMalloc)
+  if (!isRealloc)
     return { size };
   else
     return { ptr, size };
@@ -1808,20 +1808,20 @@ vector<Value*> Malloc::operands() const {
 
 void Malloc::rauw(const Value &what, Value &with) {
   RAUW(size);
-  if (allocType == tRealloc)
+  if (isRealloc)
     RAUW(ptr);
 }
 
 void Malloc::print(std::ostream &os) const {
-  if (allocType == tMalloc)
+  if (!isRealloc)
     os << getName() << " = malloc " << *size;
   else
     os << getName() << " = realloc " << *ptr << ", " << *size;
 }
 
 StateValue Malloc::toSMT(State &s) const {
-  if (allocType == tMalloc) {
-    auto &[sz, np] = s.getAndAddUndefs(*size);
+  if (!isRealloc) {
+    auto &[sz, np] = s[*size];
     // TODO: malloc's alignment is implementation defined.
     expr nonnull = expr::mkBoolVar("malloc_never_fails");
     auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, np, nonnull);
@@ -1834,7 +1834,9 @@ StateValue Malloc::toSMT(State &s) const {
 
     // If sz > p_sz, it is filled it with poison (local_block_val is
     // initialized with poison).
-    auto [p_new, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP);
+    expr nonnull = expr::mkBoolVar("malloc_never_fails");
+    auto [p_new, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, true,
+                                                  nonnull);
 
     Pointer ptr(s.getMemory(), p);
     expr p_sz = ptr.block_size();
@@ -1847,30 +1849,25 @@ StateValue Malloc::toSMT(State &s) const {
     // If memcpy's size is zero, then both ptrs can be NULL.
     s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, false);
 
-    // 1) If allocation failed, we should not free previous ptr.
-    // 2) realloc(ptr, 0) always free the ptr.
+    // 1) realloc(ptr, 0) always free the ptr.
+    // 2) If allocation failed, we should not free previous ptr.
     expr nullp = Pointer::mkNullPointer(s.getMemory())();
-    s.getMemory().free(expr::mkIf(allocated || (sz == 0), p, nullp), false);
+    s.getMemory().free(expr::mkIf((sz == 0) || allocated, p, nullp), true);
 
     return { move(p_new), expr(np_size) };
   }
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
-  if (allocType == tMalloc)
-    return Value::getTypeConstraints() &&
-           getType().enforcePtrType() &&
-           size->getType().enforceIntType();
-  else
-    return Value::getTypeConstraints() &&
-           getType().enforcePtrType() &&
-           ptr->getType().enforcePtrType() &&
-           size->getType().enforceIntType();
+  return Value::getTypeConstraints() &&
+         getType().enforcePtrType() &&
+         size->getType().enforceIntType() &&
+         (isRealloc ? ptr->getType().enforcePtrType() : true);
 }
 
 unique_ptr<Instr> Malloc::dup(const string &suffix) const {
   return make_unique<Malloc>(getType(), getName() + suffix, *size, *ptr,
-                             isNonNull, allocType);
+                             isNonNull, isRealloc);
 }
 
 
@@ -1962,9 +1959,6 @@ StateValue Free::toSMT(State &s) const {
   auto &[p, np] = s[*ptr];
   s.addUB(np);
   // If not heaponly, don't encode constraints
-  cout << "------------------" << endl;
-  cout << p << endl;
-  cout << "------------------" << endl;
   s.getMemory().free(p, !heaponly);
   return {};
 }
