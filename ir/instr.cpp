@@ -1,6 +1,6 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
-
+#include <iostream>
 #include "ir/instr.h"
 #include "ir/function.h"
 #include "ir/globals.h"
@@ -1847,10 +1847,22 @@ StateValue Malloc::toSMT(State &s) const {
     // If memcpy's size is zero, then both ptrs can be NULL.
     s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, false);
 
-    // If allocation failed, we should not free previous ptr.
+    // 1) If allocation failed, we should not free previous ptr.
+    // 2) realloc(ptr, 0) always free the ptr.
     expr nullp = Pointer::mkNullPointer(s.getMemory())();
-    s.getMemory().free(expr::mkIf(allocated, p, nullp), false);
-
+    s.getMemory().free(expr::mkIf(allocated || (sz == 0), p, nullp), false);
+/*
+    cout << "--------------" << endl;
+    cout << p_sz << endl;
+    cout << sz_zext << endl;
+    cout << memcpy_size << endl;
+    cout << allocated << endl;
+    cout << (sz == 0) << endl;
+    cout << (allocated || (sz == 0)) << endl;
+    cout << p << endl;
+    cout << expr::mkIf(allocated || (sz == 0), p, nullp) << endl;
+    cout << "--------------" << endl;
+*/
     return { move(p_new), expr(np_size) };
   }
 }
@@ -1961,6 +1973,9 @@ StateValue Free::toSMT(State &s) const {
   auto &[p, np] = s[*ptr];
   s.addUB(np);
   // If not heaponly, don't encode constraints
+  cout << "------------------" << endl;
+  cout << p << endl;
+  cout << "------------------" << endl;
   s.getMemory().free(p, !heaponly);
   return {};
 }
