@@ -1808,7 +1808,8 @@ vector<Value*> Malloc::operands() const {
 
 void Malloc::rauw(const Value &what, Value &with) {
   RAUW(size);
-  RAUW(ptr);
+  if (allocType == tRealloc)
+    RAUW(ptr);
 }
 
 void Malloc::print(std::ostream &os) const {
@@ -1820,12 +1821,13 @@ void Malloc::print(std::ostream &os) const {
 
 StateValue Malloc::toSMT(State &s) const {
   if (allocType == tMalloc) {
-  auto &[sz, np] = s.getAndAddUndefs(*size);
-  // TODO: malloc's alignment is implementation defined.
-  expr nonnull = expr::mkBoolVar("malloc_never_fails");
-  auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, np, nonnull);
+    auto &[sz, np] = s.getAndAddUndefs(*size);
+    // TODO: malloc's alignment is implementation defined.
+    expr nonnull = expr::mkBoolVar("malloc_never_fails");
+    auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, np, nonnull);
 
-    return { move(p), expr(np) };
+    expr nullp = Pointer::mkNullPointer(s.getMemory())();
+    return { expr::mkIf(move(allocated), move(p), move(nullp)), expr(np) };
   } else {
     auto &[p, np_ptr] = s[*ptr];
     auto &[sz, np_size] = s[*size];
@@ -1833,24 +1835,25 @@ StateValue Malloc::toSMT(State &s) const {
 
     // If sz > p_sz, it is filled it with poison (local_block_val is
     // initialized with poison).
-    auto p_new = s.getMemory().alloc(sz, 8, Memory::HEAP);
+    auto [p_new, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP);
+
     Pointer ptr(s.getMemory(), p);
     expr p_sz = ptr.block_size();
-
-    auto nullp = Pointer::mkNullPointer(s.getMemory());
-    expr is_null = (p_new == nullp());
-
     expr sz_zext = sz.zextOrTrunc(p_sz.bits());
-    expr memcpy_size = expr::mkIf(is_null, expr::mkUInt(0, p_sz.bits()),
-                                  expr::mkIf(p_sz.ule(sz_zext), p_sz, sz_zext));
+
+    expr memcpy_size = expr::mkIf(allocated,
+                                  expr::mkIf(p_sz.ule(p_sz), p_sz, sz_zext),
+                                  expr::mkUInt(0, p_sz.bits()));
 
     // If memcpy's size is zero, then both ptrs can be NULL.
     s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, false);
 
     // If allocation failed, we should not free previous ptr.
-    //s.getMemory().free(expr::mkIf(is_null, nullp(), p));
+    expr nullp = Pointer::mkNullPointer(s.getMemory())();
+    s.getMemory().free(expr::mkIf(allocated, p, nullp), false); //TODO: Check free unconstrainted
 
-    return { move(p_new), expr(np_size) };
+    return { expr::mkIf(move(allocated), move(p_new), move(nullp)),
+             expr(np_size) };
   }
 }
 

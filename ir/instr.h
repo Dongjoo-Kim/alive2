@@ -400,20 +400,20 @@ public:
 
 class Malloc final : public Instr {
 public:
-  enum AllocType { tMalloc, tCalloc, tRealloc };
+  enum AllocType { tMalloc, tRealloc };
 
 private:
-  Value *size, *ptr;
+  Value *ptr, *size;
   // Is this malloc (or equivalent operation, like new()) never returning
   // null?
   bool isNonNull;
   AllocType allocType;
 
 public:
-  Malloc(Type &type, std::string &&name, Value &size, Value &ptr,
+  Malloc(Type &type, std::string &&name, Value &ptr, Value &size,
          bool isNonNull, AllocType allocType)
-    : Instr(type, std::move(name)), size(&size), ptr(&ptr), isNonNull(isNonNull),
-      allocType(allocType) {}
+    : Instr(type, std::move(name)), ptr(&ptr), size(&size),
+      isNonNull(isNonNull), allocType(allocType) {}
 
   Value& getSize() const { return *size; }
   std::vector<Value*> operands() const override;
