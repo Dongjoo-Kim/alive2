@@ -1851,18 +1851,7 @@ StateValue Malloc::toSMT(State &s) const {
     // 2) realloc(ptr, 0) always free the ptr.
     expr nullp = Pointer::mkNullPointer(s.getMemory())();
     s.getMemory().free(expr::mkIf(allocated || (sz == 0), p, nullp), false);
-/*
-    cout << "--------------" << endl;
-    cout << p_sz << endl;
-    cout << sz_zext << endl;
-    cout << memcpy_size << endl;
-    cout << allocated << endl;
-    cout << (sz == 0) << endl;
-    cout << (allocated || (sz == 0)) << endl;
-    cout << p << endl;
-    cout << expr::mkIf(allocated || (sz == 0), p, nullp) << endl;
-    cout << "--------------" << endl;
-*/
+
     return { move(p_new), expr(np_size) };
   }
 }
